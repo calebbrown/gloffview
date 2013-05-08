@@ -13,6 +13,8 @@
 
 #include "common.h"
 
+typedef enum { none , rotate, zoom } motion;
+
 /* state struct. for representing the current state */
 typedef struct {
   /* values for dealing with interactive rotation */
@@ -20,13 +22,14 @@ typedef struct {
   int beginy;
   int x;
   int y;
+  motion type;
   bool motion;
   float curquat[4];
   float lastquat[4];
 
   /* frame counting variables */
   int  frames;
-  float  angle;
+  axis   rot_axis;
   long int  last_frames;
 } state;
 

@@ -10,10 +10,10 @@
 
 #ifndef _CB_FACE_H
 #define _CB_FACE_H
+#include "platform.h"
 #include "common.h"
-#include "GL/gl.h"
 
-typedef struct {
+typedef struct face_t {
   /* array of indices into a vertex array */
   int *vertex_indices;
 

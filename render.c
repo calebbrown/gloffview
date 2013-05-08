@@ -8,12 +8,11 @@
  *     desired object to applying quaternions to it.
  */
 
-#include <GL/gl.h>
-#include <GL/glu.h>
-#include <GL/glut.h>
 #include <stdio.h>
+#include <stdlib.h> /*for malloc*/
 
 #include "common.h"
+#include "platform.h"
 #include "render.h"
 #include "object.h"
 #include "face.h"
@@ -22,25 +21,10 @@
 
 
 /* Function prototypes for non interface functions */
-void init_display_list();
-void init_vertex_array();
-void render_normal();
-void render_vertex_array();
-
-/* Static globals we want hanging around */
-static bool culling;
-static render_type type;
-static object *obj;
-static int width;
-static int height;
-
-/* Store the quaternion for changing the rotation of the object */
-static float quat[4];
-static float angle;
-static axis  rot_axis;
-
-/* Display List index, used when the display list option is chosen */
-static int dl_index;
+void init_display_list(renderer *);
+void init_vertex_array(renderer *);
+void render_normal(renderer *);
+void render_vertex_array(renderer *);
 
 
 /* init_render():
@@ -49,39 +33,54 @@ static int dl_index;
            true/false to do back face culling
            the type of rendering, either normal, display lists or vertex arrays
  */
-void init_render(object *o, bool back_cull, render_type t, int w, int h){
-  /* Store the given parameters */
-  obj = o;
-  culling = back_cull;
-  type = t;
+renderer * init_render(object *o, bool back_cull, render_type t, int w, int h){
+  renderer *r;
 
-  /* Zero the quaternion so it doesn't affect anything */
-  quat[0] = quat[1] = quat[2] = quat[3] = 0;
+  r = (renderer *) malloc(sizeof(renderer));
+
+  /* Store the given parameters */
+  r->obj = o;
+  r->culling = back_cull;
+  r->type = t;
+
+  reset_view(r);
 
   /* Call render type specific initialisation code */
-  if(type==display_list)
-    init_display_list();
-  else if(type==vertex_array)
-    init_vertex_array();
+  if(r->type==display_list)
+    init_display_list(r);
+  else if(r->type==vertex_array)
+    init_vertex_array(r);
 
+  return r;
 }
 
 
 /* render():
    description: draws the given object :)
  */
-void render(){
+void render(renderer * r){
   float lightpos[] = {5.0f,5.0f,5.0f,0.0f};
   float lightcolor[] = {1.0f, 1.0f, 1.0f, 1.0f};
   float objectmat[] = {1.0f, 1.0f, 1.0f, 1.0f};
   float zero[] = {0.0f, 0.0f, 0.0f, 1.0f};
   GLfloat matrix[4][4];
 
+  if(r == NULL) return;
+
+  /* FIX ME Dirty hack to stop resize bug */
+  resize(r,r->width,r->height);
+
+  /* Enable it depending on the desired setting */
+  if(r->culling == true)
+    glEnable(GL_CULL_FACE);
+  else
+    glDisable(GL_CULL_FACE);
+
   glMatrixMode(GL_MODELVIEW);
   glLoadIdentity();
 
   /* Setup the viewer transform */
-  gluLookAt(0.0,0.0,5.0,
+  gluLookAt(0.0,0.0,5.0 * r->zoom,
             0.0,0.0,0.0,
             0.0,1.0,0.0);
 
@@ -103,35 +102,52 @@ void render(){
   glPushMatrix();
 
   /* insert transforms here! */
-  if((quat[0] == 0) &&
-     (quat[1] == 0) &&
-     (quat[2] == 0) &&
-     (quat[3] == 0)){
+  /*if((r->quat[0] == 0) &&
+     (r->quat[1] == 0) &&
+     (r->quat[2] == 0) &&
+     (r->quat[3] == 0)){*/
 
-    if(rot_axis == x) {
-      glRotatef(angle,1,0,0);
-    } else if (rot_axis == y) {
-      glRotatef(angle,0,1,0);
-    } else if (rot_axis == z) {
-      glRotatef(angle,0,0,1);
-    }
+      // rotate the angles
 
-  } else {
-    build_rotmatrix(matrix,quat);
-    glMultMatrixf(&matrix[0][0]);
-  }
+  build_rotmatrix(matrix,r->quat);
+  glMultMatrixf(&matrix[0][0]);
+
+  glMultMatrixf(&(r->rot_history[0][0]));
+
+  if(r->rot_axis == x)
+    glRotatef(r->angle,1,0,0);
+  else if(r->rot_axis == y)
+    glRotatef(r->angle,0,1,0);
+  else if(r->rot_axis == z)
+    glRotatef(r->angle,0,0,1);
 
 
   /* Render the object using desired method */
-  if(type == normal)
-    render_normal();
-  else if(type == display_list)
-    glCallList(dl_index);
+  if(r->type == normal)
+    render_normal(r);
+  else if(r->type == display_list)
+    glCallList(r->dl_index);
   else
-    render_vertex_array();
+    render_vertex_array(r);
 
+  glPopMatrix();
   glFlush();
   glutSwapBuffers();
+}
+
+void reset_view(renderer *r){
+  int i,j;
+  r->zoom = 1.0;
+
+  /* Zero the quaternion so it doesn't affect anything */
+  r->quat[0] = r->quat[1] = r->quat[2] = r->quat[3] = 0;
+
+  r->angle = 0;
+
+  /* Load identity */
+  for(i =0; i < 4; i++)
+    for(j =0; j < 4; j++)
+      r->rot_history[i][j] = (i == j) ? 1.0 : 0.0;
 }
 
 
@@ -139,11 +155,13 @@ void render(){
    description: handles the resizing (and init) of the window or viewport
    inputs: width and height
  */
-void resize(int w,int h){
-  width = w;
-  height = h;
+void resize(renderer * r, int w,int h){
+  if(r == NULL) return;
 
-  glViewport(0,0,width,height);
+  r->width = w;
+  r->height = h;
+
+  glViewport(0,0,r->width,r->height);
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
   gluPerspective(60.0, 1.0, 1.0, 40.0);
@@ -159,11 +177,8 @@ void resize(int w,int h){
   /* Set the face to cull */
   glCullFace(GL_BACK);
 
-  /* Enable it depending on the desired setting */
-  if(culling == true)
-    glEnable(GL_CULL_FACE);
-  else
-    glDisable(GL_CULL_FACE);
+  /* set the debth test func */
+  glDepthFunc(GL_LESS);
 
   /* Kinda redudant, but what the hey! */
   glClearColor(0,0,0,0);
@@ -176,45 +191,76 @@ void resize(int w,int h){
                 should be stored with the object rather than in the render code
    inputs: the quaternion (4dimensional array of floats)
  */
-void set_quaternion(float *q){
-  quat[0] = q[0];
-  quat[1] = q[1];
-  quat[2] = q[2];
-  quat[3] = q[3];
+void set_quaternion(renderer * r,float *q){
+  if(r == NULL) return;
+  r->quat[0] = q[0];
+  r->quat[1] = q[1];
+  r->quat[2] = q[2];
+  r->quat[3] = q[3];
 }
 
+void set_render_type(renderer * r, render_type t) {
+    r->type = t;
+}
 
 /* set_rotation():
    description: rotates by angle around the specified axis
-   inputs: the angle and the axis
+   inputs: the angle, degrees to change and the axis
  */
-void set_rotation(float a,axis r){
-  rot_axis = r;
-  angle = a;
-  quat[0] = 0;
-  quat[1] = 0;
-  quat[2] = 0;
-  quat[3] = 0;
+void set_rotation(renderer * r,float da,axis rot){
+  if(r == NULL) return;
+
+  if(r->rot_axis != rot) {
+    /* save the history, use the texture matrix stack */
+    glMatrixMode(GL_TEXTURE);
+    glLoadMatrixf(&(r->rot_history[0][0]));
+
+    if(r->rot_axis == x)
+      glRotatef(r->angle,1,0,0);
+    else if(r->rot_axis == y)
+      glRotatef(r->angle,0,1,0);
+    else if(r->rot_axis == z)
+      glRotatef(r->angle,0,0,1);
+
+    glGetFloatv(GL_TEXTURE_MATRIX,&(r->rot_history[0][0]));
+
+    /* change the rotation */
+    r->rot_axis = rot;
+    r->angle = 0;
+  }
+
+  r->angle += da;
+  r->angle = r->angle >= DEGREESPERREV ? r->angle - DEGREESPERREV : r->angle;
 }
+
+void set_zoom(renderer * r,float dz) {
+  if(r == NULL) return;
+  r->zoom += dz;
+}
+
+void set_culling(renderer * r, bool cull) {
+  r->culling = cull;
+}
+
 
 /* render_normal():
    description: draws the object using the normal rendering technique.
                 ie: without any fancy rendering
  */
-void render_normal(){
+void render_normal(renderer * r){
   int i,j;
   face f;
   vertex v;
 
   /* draw our model*/
-  for(i=0;i<obj->n_faces;i++){
-    f = obj->faces[i];
+  for(i=0;i<(r->obj)->n_faces;i++){
+    f = (r->obj)->faces[i];
 
     glBegin(f.draw_mode);
     glColor3f(f.colour[0],f.colour[1],f.colour[2]);
 
     for(j=0;j<f.n_vertices;j++){
-      v = obj->vertices[f.vertex_indices[j]];
+      v = (r->obj)->vertices[f.vertex_indices[j]];
       glNormal3f(v.normX,v.normY,v.normZ);
       glVertex3f(v.x,v.y,v.z);
     }
@@ -228,12 +274,12 @@ void render_normal(){
    description: draws the object using vertex arrays, which have been setup
                 earlier
  */
-void render_vertex_array(){
+void render_vertex_array(renderer * r){
   int i;
   face f;
 
-  for(i =0 ; i < obj->n_faces ; i++) {
-    f = obj->faces[i];
+  for(i =0 ; i < (r->obj)->n_faces ; i++) {
+    f = (r->obj)->faces[i];
 
     glColor3f(f.colour[0],f.colour[1],f.colour[2]);
 
@@ -246,12 +292,12 @@ void render_vertex_array(){
 /* init_vertex_array():
    description: prepares the render for drawing using vertex arrays
  */
-void init_vertex_array(){
+void init_vertex_array(renderer * r){
   float *vertices;
 
   /* recast our vertex struct as an array of floats
      fortunetly the vertex struct is setup in such a way that this works */
-  vertices = (float *) obj->vertices;
+  vertices = (float *) (r->obj)->vertices;
 
 #ifdef INDEX_OPTIMISATION
   /* rejig the object so we can save time on calls! */
@@ -273,12 +319,12 @@ void init_vertex_array(){
 /* init_display_list():
    description: prepares a display list for drawing the object
  */
-void init_display_list(){
-  dl_index = glGenLists(1);
+void init_display_list(renderer * r){
+  r->dl_index = glGenLists(1);
 
-  glNewList(dl_index,GL_COMPILE);
+  glNewList(r->dl_index,GL_COMPILE);
 
-  render_normal();
+  render_normal(r);
 
   glEndList();
 }

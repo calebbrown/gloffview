@@ -14,7 +14,7 @@
 #include "face.h"
 #include "vertex.h"
 
-typedef struct {
+typedef struct object_t {
   /* total number of vertices for this object */
   int n_vertices;
 

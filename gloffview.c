@@ -28,9 +28,9 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <GL/glut.h>
 
 #include "common.h"
+#include "platform.h"
 #include "gloffview.h"
 #include "vertex.h"
 #include "face.h"
@@ -59,6 +59,7 @@
 /* Globals for storing the current state and the configuration */
 state current;
 config options;
+renderer * r;
 
 
 void fps_output(int sig){
@@ -91,11 +92,8 @@ void automatic_idle(void){
     exit(0);
   }
 
-  current.angle =
-         ((int)(current.angle + options.rotation_rate)) % DEGREESPERREV;
-
   /* update the rotation */
-  set_rotation(current.angle,options.rotate_axis);
+  set_rotation(r, options.rotation_rate, options.rotate_axis);
 
   /* increase the total number of frames drawn count */
   current.frames++;
@@ -155,7 +153,7 @@ void interactive_motion(int x,int y){
 
     add_quats(current.lastquat, current.curquat, current.curquat);
 
-    set_quaternion(current.curquat);
+    set_quaternion(r, current.curquat);
 
     glutPostRedisplay();
   }
@@ -169,7 +167,7 @@ void interactive_motion(int x,int y){
 void display(void){
   current.last_frames++;
 
-  render();
+  render(r);
 }
 
 
@@ -181,7 +179,7 @@ void reshape(int width, int height){
   options.window_width = width;
   options.window_height = height;
 
-  resize(width,height);
+  resize(r, width,height);
 }
 
 
@@ -335,7 +333,7 @@ int main(int argc, char *argv[]) {
   glutCreateWindow("GLOffView");
 
   /* Initalise the render */
-  init_render(&model,options.back_cull,options.type,
+  r = init_render(&model,options.back_cull,options.type,
               options.window_width,options.window_height);
 
   /* Setup common callback functions */
@@ -349,11 +347,13 @@ int main(int argc, char *argv[]) {
     alarm(options.time_to_run);
   }
 
+#ifdef DEBUG
   printf("Vendor: %s\nRenderer: %s\nVersion: %s\nExtentions: %s\n",
          glGetString(GL_VENDOR),
          glGetString(GL_RENDERER),
          glGetString(GL_VERSION),
          glGetString(GL_EXTENSIONS));
+#endif
 
   /* Setup specific callback functions and do other prepwork */
   if(options.trackball) {
@@ -362,11 +362,10 @@ int main(int argc, char *argv[]) {
     glutMotionFunc(interactive_motion);
     glutKeyboardFunc(interactive_key);
 
-    set_quaternion(current.curquat);
+    set_quaternion(r, current.curquat);
 
   } else {
     current.frames = 0;
-    current.angle = 0;
     glutIdleFunc(automatic_idle);
     glutKeyboardFunc(NULL);
 

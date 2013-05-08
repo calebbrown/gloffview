@@ -15,7 +15,7 @@
 
  WARNING!!! - CHANGING the ORDER or TYPE, or ADDING new fields WILL BREAK the
               whole program! */
-typedef struct {
+typedef struct vertex_t{
   /* vertex normal. these are first for vertex array.
      because we are using GL_N3F_V3F these have to come first.
    */

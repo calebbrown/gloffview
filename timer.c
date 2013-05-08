@@ -69,7 +69,7 @@ struct timeval get_timer(void){
    */
   while(usage_stats.ru_utime.tv_usec < start_utime.tv_usec){
   printf("start usec=%ld other usec=%ld\n",
-         start_utime.tv_usec,usage_stats.ru_utime.tv_usec);
+         (long int)start_utime.tv_usec,(long int)usage_stats.ru_utime.tv_usec);
     usage_stats.ru_utime.tv_sec -= 1;     /* move the second */
     usage_stats.ru_utime.tv_usec += 1000000; /* to the usec column */
   }
@@ -89,5 +89,5 @@ void print_timer(void){
 
   temp = get_timer();
 
-  printf("timer: secs=%ld usecs=%ld\n",temp.tv_sec,temp.tv_usec);
+  printf("timer: secs=%ld usecs=%ld\n",(long int)temp.tv_sec,(long int)temp.tv_usec);
 }
