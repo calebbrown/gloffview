@@ -8,8 +8,8 @@
 $seconds_per_run = 10;
 $small_window = 300;
 $big_window = 800;
-$small_off = "../../off/tref.off";
-$big_off = "../../off/harley.off";
+$small_off = "examples/tref.off";
+$big_off = "examples/harley.off";
 $runsize = 6;
 
 ## STATISTICS::
