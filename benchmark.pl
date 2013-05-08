@@ -33,7 +33,7 @@ for($oindex = 0; $oindex <= $#oparams; $oindex++) {
     for($windex = 0; $windex <= $#wparams; $windex++) {
 	  for($findex = 0; $findex <= $#fparams; $findex++) {
 	    # build up the command to execute
-	    $command = "gloffview $fixed_params $oparams[$oindex] $bparams[$bindex] $wparams[$windex] $fparams[$findex]";
+	    $command = "./gloffview $fixed_params $oparams[$oindex] $bparams[$bindex] $wparams[$windex] $fparams[$findex]";
 
 		# print out a message
         print "$total_runs: $command\n";
